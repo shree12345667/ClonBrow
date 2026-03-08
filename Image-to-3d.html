@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HOLO-FORGE | AI Image to 3D Scene</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js for 3D Rendering -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <!-- GLTF Exporter for downloading models -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/exporters/GLTFExporter.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --hacker-red: #ff0000;
+            --hacker-dark: #050000;
+            --hacker-glow: rgba(255, 0, 0, 0.5);
+        }
+
+        body {
+            background-color: var(--hacker-dark);
+            color: var(--hacker-red);
+            font-family: 'Fira Code', monospace;
+            margin: 0;
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .glass-panel {
+            background: rgba(10, 0, 0, 0.9);
+            border-right: 1px solid var(--hacker-red);
+            box-shadow: 5px 0 20px var(--hacker-glow);
+        }
+
+        .drop-zone {
+            border: 2px dashed rgba(255, 0, 0, 0.4);
+            transition: all 0.3s ease;
+            cursor: pointer;
+            background: rgba(255, 0, 0, 0.05);
+        }
+
+        .drop-zone:hover, .drop-zone.dragover {
+            background: rgba(255, 0, 0, 0.15);
+            border-color: var(--hacker-red);
+            box-shadow: 0 0 15px var(--hacker-glow) inset;
+        }
+
+        #canvas-container {
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--hacker-red); border-radius: 0px; }
+
+        .loading-pulse {
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 0.5; text-shadow: 0 0 5px var(--hacker-red); }
+            50% { opacity: 1; text-shadow: 0 0 20px var(--hacker-red); }
+            100% { opacity: 0.5; text-shadow: 0 0 5px var(--hacker-red); }
+        }
+
+        .btn-glow {
+            background: var(--hacker-dark);
+            border: 1px solid var(--hacker-red);
+            color: var(--hacker-red);
+            transition: all 0.3s;
+        }
+        .btn-glow:hover:not(:disabled) {
+            background: var(--hacker-red);
+            color: black;
+            box-shadow: 0 0 20px var(--hacker-glow);
+        }
+        .btn-glow:disabled {
+            border-color: #550000;
+            color: #550000;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        .glitch-text {
+            text-shadow: 1px 0 #fff, -1px 0 #f00;
+            animation: glitch 2s infinite linear alternate-reverse;
+        }
+
+        @keyframes glitch {
+            0% { text-shadow: 1px 0 #fff, -1px 0 #f00; }
+            50% { text-shadow: -1px 0 #fff, 1px 0 #f00; }
+            100% { text-shadow: 1px 0 #fff, -1px 0 #f00; }
+        }
+
+        .scanline {
+            width: 100%;
+            height: 100px;
+            z-index: 50;
+            background: linear-gradient(0deg, rgba(0, 0, 0, 0) 0%, rgba(255, 0, 0, 0.05) 50%, rgba(0, 0, 0, 0) 100%);
+            position: absolute;
+            bottom: 100%;
+            animation: scanline 8s linear infinite;
+            pointer-events: none;
+        }
+
+        @keyframes scanline {
+            0% { bottom: 100%; }
+            100% { bottom: -100px; }
+        }
+    </style>
+</head>
+<body class="flex flex-col h-screen">
+    <div class="scanline"></div>
+
+    <!-- Header -->
+    <header class="h-14 border-b border-red-900 flex items-center justify-between px-6 bg-black z-10">
+        <div class="flex items-center gap-3">
+            <div class="w-3 h-3 rounded-none bg-red-600 shadow-[0_0_10px_#ff0000]"></div>
+            <h1 class="font-bold tracking-widest glitch-text text-red-500">
+                HOLO-FORGE
+            </h1>
+            <span class="text-xs text-red-900 ml-2 border border-red-900 px-2 py-0.5 rounded-none hidden sm:inline-block">SYSTEM_ARCHITECT_v2.0</span>
+        </div>
+        <div class="text-xs text-red-700 hidden md:block">
+            [ ROOT@FORGE:~# ./INIT_THREE_JS_ENGINE ]
+        </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <div class="flex-1 flex flex-col md:flex-row overflow-hidden relative">
+        
+        <!-- Left Control Panel -->
+        <div class="w-full md:w-80 lg:w-96 glass-panel flex flex-col p-6 z-10 overflow-y-auto">
+            
+            <h2 class="text-sm font-bold text-white mb-2 uppercase tracking-wider">>> 1. UPLOAD TARGET DATA</h2>
+            <p class="text-xs text-red-400 mb-4 leading-relaxed opacity-80">
+                Provide visual input. Neural net will extract depth and color vectors to compile a 3D geometry matrix.
+            </p>
+
+            <!-- Drag & Drop Area -->
+            <div id="drop-zone" class="drop-zone flex flex-col items-center justify-center p-6 text-center mb-4 min-h-[160px]">
+                <svg class="w-10 h-10 text-red-600 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                <p class="text-sm text-red-500 font-bold">DRAG & DROP IMAGE</p>
+                <p class="text-xs text-red-800 mt-1">OR CLICK TO BROWSE LOCAL FILES</p>
+                <input type="file" id="file-input" class="hidden" accept="image/*">
+            </div>
+
+            <!-- Preview Area -->
+            <div id="preview-container" class="hidden mb-6 relative group border border-red-900 p-1 bg-black">
+                <img id="image-preview" class="w-full h-auto border border-red-900/50 grayscale hover:grayscale-0 transition-all duration-500" src="" alt="Preview">
+                <button id="remove-img-btn" class="absolute top-2 right-2 bg-red-900 text-black font-bold p-1 px-2 text-xs opacity-0 group-hover:opacity-100 transition-opacity border border-red-500 hover:bg-red-500">
+                    X ABORT
+                </button>
+            </div>
+
+            <!-- Generate Button -->
+            <button id="generate-btn" disabled class="btn-glow w-full py-3 font-bold tracking-widest uppercase mb-2 flex justify-center items-center gap-2">
+                EXECUTE COMPILE
+            </button>
+
+            <!-- Export Button -->
+            <button id="export-btn" class="hidden w-full py-2 text-xs font-bold tracking-widest uppercase mb-6 flex justify-center items-center gap-2 border border-red-900 text-red-500 hover:bg-red-600 hover:text-black transition-all">
+                [ DOWNLOAD 3D MODEL (.GLB) ]
+            </button>
+
+            <!-- Status / Logs -->
+            <div class="mt-auto">
+                <h3 class="text-[10px] text-red-600 uppercase tracking-widest mb-2 border-b border-red-900/50 pb-1">TERMINAL // SYSTEM LOG</h3>
+                <div id="status-log" class="text-xs font-mono text-red-500 space-y-1 bg-black/80 border border-red-900/30 p-3 h-32 overflow-y-auto">
+                    <div><span class="text-white opacity-50">[SYS]</span> Holo-Forge Engine Ready.</div>
+                    <div><span class="text-white opacity-50">[SYS]</span> Waiting for visual data packet...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right 3D Canvas Area -->
+        <div class="flex-1 relative bg-[#050000]">
+            <div id="canvas-container"></div>
+            
+            <!-- Loading Overlay -->
+            <div id="loading-overlay" class="absolute inset-0 bg-black/90 backdrop-blur-sm flex flex-col items-center justify-center hidden z-20">
+                <div class="w-16 h-16 border-4 border-red-900 border-t-red-500 rounded-none animate-spin mb-4"></div>
+                <div class="text-red-500 font-bold tracking-widest loading-pulse text-xl" id="loading-text">
+                    EXTRACTING VECTORS...
+                </div>
+                <div class="text-xs text-red-800 mt-2 font-mono glitch-text">OVERRIDING THREE.JS PROTOCOLS</div>
+            </div>
+
+            <!-- Controls Helper -->
+            <div class="absolute bottom-4 left-4 right-4 flex justify-between pointer-events-none text-[10px] text-red-800 font-mono z-10 border-t border-red-900/30 pt-2 bg-black/40 px-2">
+                <span>[MOUSE_0]: ROTATE | [MOUSE_1]: PAN | [SCROLL]: ZOOM</span>
+                <span>SECURE UPLINK: GEMINI 2.5 FLASH</span>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // API KEY PROVIDED BY USER
+        const apiKey = "AIzaSyCfKX9RN6i6AIhsRj2_LBFs6Jrq022fUwk"; 
+        
+        // UI Elements
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const previewContainer = document.getElementById('preview-container');
+        const imagePreview = document.getElementById('image-preview');
+        const removeImgBtn = document.getElementById('remove-img-btn');
+        const generateBtn = document.getElementById('generate-btn');
+        const exportBtn = document.getElementById('export-btn');
+        const statusLog = document.getElementById('status-log');
+        const loadingOverlay = document.getElementById('loading-overlay');
+        const loadingText = document.getElementById('loading-text');
+
+        let currentBase64Image = null;
+        let currentMimeType = null;
+
+        // --- THREE.JS SETUP ---
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        // Add subtle fog to blend the horizon
+        scene.fog = new THREE.FogExp2(0x050000, 0.02);
+
+        const camera = new THREE.PerspectiveCamera(60, container.clientWidth / container.clientHeight, 0.1, 1000);
+        camera.position.set(0, 10, 20);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        container.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.maxPolarAngle = Math.PI / 2 + 0.1; // Don't go too far below ground
+
+        // Global group to hold AI generated objects so we can easily clear them
+        let aiGeneratedGroup = new THREE.Group();
+        scene.add(aiGeneratedGroup);
+
+        function initBaseScene() {
+            // Ambient light
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.2);
+            scene.add(ambientLight);
+
+            // Grid helper
+            const gridHelper = new THREE.GridHelper(50, 50, 0xff0000, 0x330000);
+            gridHelper.material.opacity = 0.3;
+            gridHelper.material.transparent = true;
+            gridHelper.position.y = -0.01;
+            scene.add(gridHelper);
+
+            // Base plane
+            const planeGeo = new THREE.PlaneGeometry(50, 50);
+            const planeMat = new THREE.MeshStandardMaterial({ 
+                color: 0x050000, 
+                roughness: 0.9,
+                metalness: 0.1
+            });
+            const plane = new THREE.Mesh(planeGeo, planeMat);
+            plane.rotation.x = -Math.PI / 2;
+            plane.receiveShadow = true;
+            scene.add(plane);
+        }
+        initBaseScene();
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            if(!container) return;
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        });
+
+        // --- UI & LOGIC ---
+
+        function logStatus(msg) {
+            const div = document.createElement('div');
+            const time = new Date().toLocaleTimeString('en-US', { hour12: false, hour: "numeric", minute: "numeric", second: "numeric" });
+            div.innerHTML = `<span class="text-white opacity-50">[${time}]</span> <span class="text-red-400">${msg}</span>`;
+            statusLog.appendChild(div);
+            statusLog.scrollTop = statusLog.scrollHeight;
+        }
+
+        // File Drag & Drop Handlers
+        dropZone.addEventListener('click', () => fileInput.click());
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            if (e.dataTransfer.files.length) {
+                handleFile(e.dataTransfer.files[0]);
+            }
+        });
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length) {
+                handleFile(e.target.files[0]);
+            }
+        });
+
+        function handleFile(file) {
+            if (!file.type.startsWith('image/')) {
+                logStatus("Error: Please upload an image file.");
+                return;
+            }
+
+            currentMimeType = file.type;
+            const reader = new FileReader();
+            
+            reader.onload = (e) => {
+                const fullDataUrl = e.target.result;
+                imagePreview.src = fullDataUrl;
+                
+                // Extract just the base64 part
+                currentBase64Image = fullDataUrl.split(',')[1];
+                
+                dropZone.classList.add('hidden');
+                previewContainer.classList.remove('hidden');
+                generateBtn.disabled = false;
+                logStatus(`Image loaded: ${file.name}`);
+            };
+            reader.readAsDataURL(file);
+        }
+
+        removeImgBtn.addEventListener('click', () => {
+            currentBase64Image = null;
+            currentMimeType = null;
+            imagePreview.src = "";
+            previewContainer.classList.add('hidden');
+            dropZone.classList.remove('hidden');
+            generateBtn.disabled = true;
+            exportBtn.classList.add('hidden');
+            fileInput.value = "";
+            logStatus("Image removed. Waiting for input.");
+        });
+
+        // --- AI API LOGIC ---
+
+        async function processImageTo3D() {
+            if (!currentBase64Image) return;
+
+            // Reset UI and 3D scene
+            generateBtn.disabled = true;
+            exportBtn.classList.add('hidden');
+            loadingOverlay.classList.remove('hidden');
+            
+            // Clear previous generated objects
+            while(aiGeneratedGroup.children.length > 0){ 
+                let child = aiGeneratedGroup.children[0];
+                if(child.geometry) child.geometry.dispose();
+                if(child.material) {
+                    if(Array.isArray(child.material)) child.material.forEach(m => m.dispose());
+                    else child.material.dispose();
+                }
+                aiGeneratedGroup.remove(child); 
+            }
+
+            logStatus("Initiating visual analysis sequence...");
+
+            const systemPrompt = `You are an expert 3D Graphics Programmer. 
+Your task is to analyze the provided image and write a SINGLE, COMPLETE JavaScript code block using the Three.js library to build a stylized, abstract 3D diorama representing the main elements, colors, and layout of the image.
+
+AVAILABLE ENVIRONMENT:
+- A global THREE.Group named \`aiGeneratedGroup\` is available. You MUST add all your meshes, lights, and objects to this group (e.g., \`aiGeneratedGroup.add(mesh);\`).
+- The global \`THREE\` object is available.
+- Do NOT create a scene, camera, renderer, or animation loop. That is already handled.
+- Just create geometries, materials, meshes, and lights, position them, and add them to \`aiGeneratedGroup\`.
+
+RULES:
+1. Use standard primitives (BoxGeometry, SphereGeometry, CylinderGeometry, ConeGeometry).
+2. Use MeshStandardMaterial to react to light. Extract the dominant colors from the image and apply them to the materials using hex codes (e.g., 0xff0000).
+3. Scale and position the objects to create a pleasing composition centered around (x:0, y:0, z:0). Do not place objects beneath y=0.
+4. Add 1 or 2 dynamic lights (PointLight, SpotLight, or DirectionalLight) with colors matching the lighting/mood of the image. Enable castShadow on lights and objects.
+5. Create a ground or base structure if appropriate for the image context.
+6. YOUR ENTIRE RESPONSE MUST ONLY BE JAVASCRIPT CODE WRAPPED IN \`\`\`javascript ... \`\`\` MARKDOWN BLOCK. NO OTHER TEXT.`;
+
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+            
+            const payload = {
+                contents: [
+                    {
+                        parts: [
+                            { text: systemPrompt },
+                            {
+                                inlineData: {
+                                    mimeType: currentMimeType,
+                                    data: currentBase64Image
+                                }
+                            }
+                        ]
+                    }
+                ],
+                // Force low temperature for better code reliability
+                generationConfig: { temperature: 0.2 }
+            };
+
+            let delay = 1000;
+            for (let i = 0; i < 5; i++) {
+                try {
+                    loadingText.textContent = "EXTRACTING GEOMETRIC DATA...";
+                    
+                    let response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (response.status === 404) {
+                        logStatus("Model 2.5 not found, fallback to 1.5-flash.");
+                        let url15 = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+                        response = await fetch(url15, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+                    }
+
+                    if (!response.ok) throw new Error(`API Error: ${response.status}`);
+                    
+                    const data = await response.json();
+                    const aiResponseText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                    
+                    if (!aiResponseText) throw new Error("Empty response from AI.");
+
+                    loadingText.textContent = "COMPILING THREE.JS SCENE...";
+                    logStatus("Code generated. Executing in secure context...");
+                    
+                    // Extract JavaScript block
+                    const jsMatch = aiResponseText.match(/```javascript\n([\s\S]*?)\n```/) || 
+                                    aiResponseText.match(/```js\n([\s\S]*?)\n```/) ||
+                                    aiResponseText.match(/```\n([\s\S]*?)\n```/);
+                                    
+                    let codeToExecute = "";
+                    if (jsMatch && jsMatch[1]) {
+                        codeToExecute = jsMatch[1];
+                    } else {
+                        // Fallback if AI forgot markdown formatting but sent raw code
+                        codeToExecute = aiResponseText;
+                    }
+
+                    // Execute the generated code
+                    executeThreeJSCode(codeToExecute);
+                    
+                    logStatus("3D Scene forged successfully.");
+                    exportBtn.classList.remove('hidden');
+                    break; // Success, exit retry loop
+
+                } catch (e) {
+                    if (i === 4) {
+                        logStatus(`CRITICAL ERROR: ${e.message}`);
+                        console.error("Full error:", e);
+                    }
+                    await new Promise(res => setTimeout(res, delay));
+                    delay *= 2;
+                }
+            }
+
+            loadingOverlay.classList.add('hidden');
+            generateBtn.disabled = false;
+        }
+
+        function executeThreeJSCode(code) {
+            try {
+                // We create a new function scope, passing in THREE and aiGeneratedGroup
+                // This prevents the AI from accidentally messing with global window variables easily
+                const buildScene = new Function('THREE', 'aiGeneratedGroup', code);
+                buildScene(THREE, aiGeneratedGroup);
+                
+                // Slightly adjust camera to look at the new objects
+                const box = new THREE.Box3().setFromObject(aiGeneratedGroup);
+                const center = box.getCenter(new THREE.Vector3());
+                controls.target.copy(center);
+                controls.update();
+                
+            } catch (error) {
+                logStatus(`Render Error: AI generated invalid syntax. Retrying recommended.`);
+                console.error("Generated Code Execution Failed:", error);
+                console.log("Faulty Code:\n", code);
+            }
+        }
+
+        generateBtn.addEventListener('click', processImageTo3D);
+
+        // --- EXPORT LOGIC ---
+        exportBtn.addEventListener('click', () => {
+            if (aiGeneratedGroup.children.length === 0) {
+                logStatus("Error: No geometry to export.");
+                return;
+            }
+            
+            logStatus("Compiling .GLB binary file...");
+            
+            try {
+                const exporter = new THREE.GLTFExporter();
+                exporter.parse(
+                    aiGeneratedGroup,
+                    function (gltf) {
+                        const blob = new Blob([gltf], { type: 'application/octet-stream' });
+                        const url = URL.createObjectURL(blob);
+                        const link = document.createElement('a');
+                        link.style.display = 'none';
+                        link.href = url;
+                        link.download = `HOLO_FORGE_${Date.now()}.glb`;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        URL.revokeObjectURL(url);
+                        logStatus("Export complete. File downloaded.");
+                    },
+                    function (error) {
+                        logStatus("Export Error: " + error.message);
+                    },
+                    { binary: true } // Creates a single embedded .glb file
+                );
+            } catch (err) {
+                logStatus("Exporter Error: " + err.message);
+            }
+        });
+
+    </script>
+</body>
+</html>

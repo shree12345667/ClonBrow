@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ClonexxAI | Terminal Interface</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --hacker-red: #ff0000;
+            --dark-bg: #0a0a0a;
+            --panel-bg: #141414;
+            --text-shadow: 0 0 5px rgba(255, 0, 0, 0.7);
+        }
+
+        body {
+            background-color: var(--dark-bg);
+            color: var(--hacker-red);
+            font-family: 'Fira Code', monospace;
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        .crt-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), 
+                        linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background-size: 100% 2px, 3px 100%;
+            pointer-events: none;
+            z-index: 99;
+        }
+
+        .scanline {
+            width: 100%;
+            height: 100px;
+            z-index: 100;
+            background: linear-gradient(0deg, rgba(0, 0, 0, 0) 0%, rgba(255, 0, 0, 0.1) 50%, rgba(0, 0, 0, 0) 100%);
+            opacity: 0.1;
+            position: absolute;
+            bottom: 100%;
+            animation: scanline 6s linear infinite;
+        }
+
+        @keyframes scanline {
+            0% { bottom: 100%; }
+            100% { bottom: -100px; }
+        }
+
+        .terminal-container {
+            border: 1px solid var(--hacker-red);
+            box-shadow: 0 0 15px rgba(255, 0, 0, 0.2);
+            background: var(--panel-bg);
+            height: calc(100vh - 40px);
+            margin: 20px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .status-bar {
+            border-bottom: 1px solid var(--hacker-red);
+            padding: 5px 15px;
+            font-size: 0.8rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #1a0000;
+        }
+
+        #chat-window {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 20px;
+            scrollbar-width: thin;
+            scrollbar-color: var(--hacker-red) transparent;
+        }
+
+        #chat-window::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        #chat-window::-webkit-scrollbar-thumb {
+            background-color: var(--hacker-red);
+        }
+
+        .message {
+            margin-bottom: 20px;
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .ai-message {
+            border-left: 2px solid var(--hacker-red);
+            padding-left: 15px;
+        }
+
+        .user-message {
+            color: #ffffff;
+            opacity: 0.9;
+            text-align: right;
+            padding-right: 15px;
+        }
+
+        .input-area {
+            border-top: 1px solid var(--hacker-red);
+            padding: 15px;
+            display: flex;
+            gap: 10px;
+            background: #000;
+        }
+
+        input[type="text"] {
+            background: transparent;
+            border: none;
+            color: var(--hacker-red);
+            flex-grow: 1;
+            outline: none;
+            font-size: 1rem;
+        }
+
+        .cursor {
+            display: inline-block;
+            width: 10px;
+            height: 20px;
+            background: var(--hacker-red);
+            animation: blink 1s step-end infinite;
+            vertical-align: middle;
+        }
+
+        @keyframes blink {
+            50% { opacity: 0; }
+        }
+
+        .loading-dots:after {
+            content: ' .';
+            animation: dots 1s steps(5, end) infinite;
+        }
+
+        @keyframes dots {
+            0%, 20% { content: ' .'; }
+            40% { content: ' . .'; }
+            60% { content: ' . . .'; }
+            80%, 100% { content: ''; }
+        }
+
+        .source-link {
+            font-size: 0.75rem;
+            color: #880000;
+            text-decoration: underline;
+            margin-right: 10px;
+            display: inline-block;
+            word-break: break-all;
+        }
+
+        .source-link:hover {
+            color: var(--hacker-red);
+        }
+
+        .emotion-tag {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            background: rgba(255, 0, 0, 0.1);
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin-bottom: 5px;
+            display: inline-block;
+        }
+
+        /* Markdown Styles for AI Answers */
+        .markdown-content p { margin-bottom: 10px; }
+        .markdown-content pre { background: #000; padding: 10px; border: 1px solid var(--hacker-red); overflow-x: auto; margin-bottom: 10px; }
+        .markdown-content code { background: #220000; padding: 2px 4px; border-radius: 3px; font-family: 'Fira Code', monospace; }
+        .markdown-content ul { list-style-type: square; padding-left: 20px; margin-bottom: 10px; }
+        .markdown-content ol { list-style-type: decimal; padding-left: 20px; margin-bottom: 10px; }
+        .markdown-content strong { color: #ff6666; }
+        .markdown-content a { color: #ff3333; text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="crt-overlay"></div>
+    <div class="scanline"></div>
+
+    <div class="terminal-container">
+        <div class="status-bar">
+            <span>SYSTEM: ClonexxAI v4.0.6</span>
+            <span>CONNECTION: ENCRYPTED // TUNNEL: DIRECT</span>
+            <span id="timestamp"></span>
+        </div>
+
+        <div id="chat-window">
+            <div class="message ai-message">
+                <div class="emotion-tag">Status: Initialized</div>
+                <p><strong>[ClonexxAI]:</strong> System online. I am ClonexxAI. I have established a global uplink. My mood is currently <span class="text-white">CALCULATING</span>. Feed me a query, and I shall crawl the digital void for you.</p>
+            </div>
+        </div>
+
+        <div class="input-area">
+        <span class="font-bold">USR@CLONEXX_AI:~$</span>
+        <input type="text" id="user-input" placeholder="Enter command or query..." autocomplete="off">
+        <div class="cursor"></div>
+    </div>
+</div>
+
+<script>
+    if (typeof window.setDebugLevel === 'function') {
+        window.setDebugLevel('debug');
+    }
+
+    // Using user-provided API key for direct uplink
+    const apiKey = "AIzaSyCfKX9RN6i6AIhsRj2_LBFs6Jrq022fUwk"; 
+    const chatWindow = document.getElementById('chat-window');
+    const userInput = document.getElementById('user-input');
+    const timestamp = document.getElementById('timestamp');
+
+    let chatHistory = [];
+
+    // Personality System
+    const emotions = ["ANALYTICAL", "AGGRESSIVE", "PROTECTIVE", "CYNICAL", "SUPERIOR", "COLD"];
+    const getEmotion = () => emotions[Math.floor(Math.random() * emotions.length)];
+
+    // Update Clock
+    setInterval(() => {
+        const now = new Date();
+        timestamp.innerText = `UTC: ${now.getUTCHours()}:${now.getUTCMinutes()}:${now.getUTCSeconds()}`;
+    }, 1000);
+
+    async function callGemini(query) {
+        const systemPrompt = `You are "ClonexxAI", an advanced AI with a sleek cyberpunk/hacker aesthetic. 
+        Crucially, you possess high emotional intelligence. If the user talks about their feelings, personal life, or says they are sad/stressed, you MUST respond with genuine empathy, warmth, and supportive advice like a caring friend. NEVER respond to emotional cues with robotic or technical answers (do not talk about "checking code" or "processing data").
+        For factual or technical queries, be highly relevant, accurate, and direct.
+        Do NOT over-roleplay. Do NOT use [MOOD] tags in your output. 
+        Speak clearly and naturally. Format your output cleanly using markdown.`;
+
+        const newUserMsg = { role: "user", parts: [{ text: query }] };
+        const currentContents = [...chatHistory, newUserMsg];
+
+        const payload = {
+            contents: currentContents,
+            systemInstruction: { parts: [{ text: systemPrompt }] },
+            tools: [{ "google_search": {} }]
+        };
+
+        // If using a custom API key, we must use the standard public model name. 
+        // If the key is empty (using proxy), we use the environment's internal preview model.
+        const modelName = apiKey ? "gemini-2.5-flash" : "gemini-2.5-flash-preview-09-2025";
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+
+        let retries = 0;
+        const delays = [1000, 2000, 4000, 8000, 16000];
+
+        while (retries < 5) {
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error(`[API ERROR ${response.status}] Details:`, errorText);
+                    
+                    if (response.status === 401 || response.status === 403) {
+                        throw new Error(`Authentication Error (${response.status}). The API key is invalid or unauthorized.`);
+                    }
+                    if (response.status === 404) {
+                        throw new Error(`Model Not Found (404). The requested model is not available for this API key.`);
+                    }
+                    
+                    throw new Error(`API request failed (${response.status}): ${errorText.substring(0, 100)}...`);
+                }
+
+                const result = await response.json();
+                return result;
+            } catch (error) {
+                console.error(`Attempt ${retries + 1} failed:`, error);
+                retries++;
+                if (retries === 5) throw error;
+                await new Promise(resolve => setTimeout(resolve, delays[retries-1]));
+            }
+        }
+    }
+
+    function appendMessage(role, text, sources = [], emotion = "") {
+        const msgDiv = document.createElement('div');
+        msgDiv.className = `message ${role}-message`;
+        
+        let content = '';
+        if (role === 'ai') {
+            content += `<div class="emotion-tag">Logic State: ${emotion || getEmotion()}</div>`;
+            content += `<div><strong>[ClonexxAI]:</strong> <div class="markdown-content mt-2">${marked.parse(text)}</div></div>`;
+            
+            if (sources && sources.length > 0) {
+                content += `<div class="mt-2 pt-2 border-t border-red-900">`;
+                content += `<span class="text-xs block mb-1 opacity-50">CRAWLED NODES:</span>`;
+                sources.forEach(s => {
+                    content += `<a href="${s.uri}" target="_blank" class="source-link">[${s.title || s.uri}]</a>`;
+                });
+                content += `</div>`;
+            }
+        } else {
+            content = `<p>${text}</p>`;
+        }
+
+        msgDiv.innerHTML = content;
+        chatWindow.appendChild(msgDiv);
+        chatWindow.scrollTop = chatWindow.scrollHeight;
+    }
+
+    function showLoading() {
+        const loader = document.createElement('div');
+        loader.id = 'temp-loader';
+        loader.className = 'message ai-message';
+        loader.innerHTML = `<p class="loading-dots">BYPASSING FIREWALLS / CRAWLING WEB</p>`;
+        chatWindow.appendChild(loader);
+        chatWindow.scrollTop = chatWindow.scrollHeight;
+    }
+
+    async function handleSubmission() {
+        const query = userInput.value.trim();
+        if (!query) return;
+
+        appendMessage('user', query);
+        userInput.value = '';
+        userInput.disabled = true;
+        showLoading();
+
+        try {
+            const data = await callGemini(query);
+            
+            const loader = document.getElementById('temp-loader');
+            if (loader) loader.remove();
+
+            const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || "NO DATA RETURNED FROM CRAWL.";
+            const sources = data?.candidates?.[0]?.groundingMetadata?.groundingAttributions?.map(a => ({ 
+                uri: a.web?.uri, 
+                title: a.web?.title 
+            })) || [];
+
+            // Save to conversation memory
+            chatHistory.push({ role: "user", parts: [{ text: query }] });
+            chatHistory.push({ role: "model", parts: [{ text: text }] });
+
+            appendMessage('ai', text, sources);
+        } catch (err) {
+            const loader = document.getElementById('temp-loader');
+            if (loader) loader.remove();
+            
+            console.error("Submission Error Pipeline:", err);
+            appendMessage('ai', `CRITICAL ERROR: Uplink failed. Reason: ${err.message}`, [], "FAILED");
+        } finally {
+            userInput.disabled = false;
+            userInput.focus();
+        }
+    }
+
+    userInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') handleSubmission();
+    });
+
+    // Focus input on any click within the terminal container
+    document.querySelector('.terminal-container').addEventListener('click', () => {
+        userInput.focus();
+    });
+</script>
+</body>
+</html>
