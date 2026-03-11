@@ -1,5 +1,5 @@
 🔴 CLONBROW // NODE_OS
-The Multimodal AI-Operated Workspace | v1.0
+The Multimodal AI-Operated Workspace | v1.0                                                                                                                        Made by a 6th Grader 
 
 🚀 Executive Summary
 Clonbrow // NODE_OS is a high-performance, single-file AI operating system environment built for the web. By leveraging a "Red Hacker" terminal interface, it provides a comprehensive suite of AI-driven tools that synthesize research, generate 3D matrices, and deploy web applications instantly—all within one standalone HTML environment.
@@ -40,4 +40,18 @@ Clone the Repository: Download the index.html file.
 
 Environment Setup: Ensure your Gemini API key is configured within the designated chatApiKey or apiKey variables for your selected module.
 
-Run: Open in any modern web browser to initialize the system boot sequence.
+Run: Open in any modern web browser to initialize the system boot sequence.                                                                                                                                                                                                                                                           
+#CLONBROW // API Line Directory(ClonBrow'V'1)
+Clonexxa AI Chatbot API: Line 417 (#L417)
+
+Research AI Redcell API: Line 498 (#L498)
+
+Educational Report Maker: Line 575 (#L575)
+
+Tutor Node (Doubt Solver): Line 640 (#L640)
+
+Image-to-3D Model: Line 705 (#L705)
+
+Text-to-Game Maker: Line 787 (#L787)
+
+Text-to-Website Maker: Line 852 (#L852)
