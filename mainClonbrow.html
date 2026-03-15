@@ -1,0 +1,1272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clonbrow - AI Operated OS Browser</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;500;700&family=Share+Tech+Mono&display=swap');
+
+        :root {
+            --hacker-red: #ff0000;
+            --hacker-dark-red: #4a0000;
+            --hacker-bg: #050000;
+            --hacker-glow: 0 0 10px rgba(255, 0, 0, 0.5);
+            --hacker-grid: rgba(255, 0, 0, 0.05);
+        }
+
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #050000; }
+        ::-webkit-scrollbar-thumb { background: var(--hacker-dark-red); border: 1px solid var(--hacker-red); }
+        ::-webkit-scrollbar-thumb:hover { background: var(--hacker-red); box-shadow: var(--hacker-glow); }
+
+        body {
+            background-color: var(--hacker-bg);
+            color: var(--hacker-red);
+            font-family: 'Fira Code', monospace;
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .cyber-grid {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-image: 
+                linear-gradient(var(--hacker-grid) 1px, transparent 1px),
+                linear-gradient(90deg, var(--hacker-grid) 1px, transparent 1px);
+            background-size: 30px 30px;
+            z-index: -2;
+        }
+
+        .matrix-bg {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: -1; opacity: 0.15;
+        }
+
+        .glass-panel {
+            background: rgba(5, 0, 0, 0.95);
+            border: 1px solid var(--hacker-red);
+            box-shadow: 0 0 10px rgba(255, 0, 0, 0.2);
+        }
+
+        .tab-active {
+            background-color: var(--hacker-dark-red);
+            border-bottom: 2px solid var(--hacker-red);
+            color: white;
+            text-shadow: 0 0 8px var(--hacker-red);
+        }
+
+        .glitch-text { 
+            position: relative; 
+            display: inline-block; 
+            text-shadow: 2px 0 0 rgba(255,0,0,0.5), -2px 0 0 rgba(0,0,255,0.5);
+        }
+
+        input {
+            background: #150000 !important;
+            border: 1px solid var(--hacker-dark-red) !important;
+            color: var(--hacker-red) !important;
+            outline: none;
+            transition: all 0.2s ease;
+        }
+
+        input:focus { border-color: var(--hacker-red) !important; box-shadow: var(--hacker-glow); }
+
+        .btn-action {
+            padding: 5px 15px;
+            border: 1px solid var(--hacker-red);
+            transition: all 0.2s;
+            cursor: pointer;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            background: rgba(20, 0, 0, 0.8);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-action:hover { background: var(--hacker-red); color: black; box-shadow: 0 0 15px var(--hacker-red); letter-spacing: 1px; }
+
+        .app-card { 
+            background: rgba(10, 0, 0, 0.9); 
+            border: 1px solid var(--hacker-dark-red); 
+            transition: all 0.2s ease-out; 
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .app-card:hover { 
+            background: rgba(40, 0, 0, 0.95); 
+            border-color: var(--hacker-red); 
+            box-shadow: 0 5px 15px rgba(255, 0, 0, 0.3); 
+            transform: translateY(-2px); 
+        }
+
+        .app-font { font-family: 'Share Tech Mono', monospace; }
+        
+        .scanlines-bg {
+            background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.25) 50%, rgba(0,0,0,0.25));
+            background-size: 100% 4px;
+        }
+        
+        .ig-glow { text-shadow: 0 0 5px rgba(255, 0, 0, 0.8), 0 0 15px rgba(255, 0, 0, 0.4); }
+        
+        .result-node { 
+            border: 1px solid #300; 
+            padding: 15px; 
+            margin-bottom: 15px; 
+            transition: all 0.3s ease; 
+            background: #080000; 
+        }
+
+        .result-node:hover { border-color: #f00; box-shadow: -5px 0 15px rgba(255,0,0,0.4); transform: translateX(10px); }
+        
+        .iframe-controls { position: absolute; top: 10px; right: 10px; display: flex; flex-direction: column; gap: 10px; z-index: 50; }
+        
+        .view-layer {
+            transition: opacity 0.2s ease-in-out;
+        }
+        .view-layer.hidden {
+            opacity: 0;
+            pointer-events: none;
+            display: none !important;
+        }
+        .view-layer:not(.hidden) {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="cyber-grid"></div>
+    <canvas id="matrix" class="matrix-bg"></canvas>
+
+    <!-- Header -->
+    <header class="glass-panel p-2 flex flex-col gap-2 z-20 relative">
+        <div class="flex items-center justify-between px-4">
+            <div class="flex items-center gap-4">
+                <h1 class="text-xl font-bold tracking-widest glitch-text">CLONBROW // NODE_OS</h1>
+            </div>
+            <div class="flex items-center gap-4">
+                <span id="system-time" class="text-xs opacity-70 font-mono"></span>
+                <div class="flex gap-2">
+                    <div class="w-3 h-3 rounded-full bg-red-600 shadow-[0_0_8px_red] animate-pulse"></div>
+                    <div class="w-3 h-3 rounded-full bg-red-900"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-2 px-2">
+            <button onclick="window.goHome()" class="btn-action">HOME</button>
+            <!-- TOP SEARCH BAR AND CRAWL BUTTON REMAIN REMOVED AS REQUESTED -->
+        </div>
+
+        <div class="flex items-center justify-between border-t border-red-900 mt-1 pt-1">
+            <div id="tabs-container" class="flex gap-1 overflow-x-auto no-scrollbar max-w-[80%]"></div>
+            <button onclick="window.addNewTab()" class="px-4 py-1 text-lg hover:text-white border-l border-red-900 hover:bg-red-900 transition-colors">+</button>
+        </div>
+    </header>
+
+    <main class="flex-grow relative overflow-hidden flex bg-transparent">
+        <div id="viewport-container" class="w-full h-full relative">
+            
+            <!-- Home Screen -->
+            <div id="home-screen" class="view-layer flex flex-col items-center justify-start pt-10 h-full overflow-y-auto z-10 relative bg-transparent px-4 pb-20">
+                <div class="mb-8 text-center">
+                    <pre class="text-[8px] md:text-[10px] leading-tight text-red-800 hidden md:block">
+██████╗██╗      ██████╗ ███╗   ██╗██████╗ ██████╗  ██████╗ ██╗    ██╗
+██╔════╝██║      ██╔═══██╗████╗  ██║██╔══██╗██╔══██╗██╔═══██╗██║    ██║
+██║     ██║      ██║   ██║██╔██╗ ██║██████╔╝██████╔╝██║   ██║██║ █╗ ██║
+██║     ██║      ██║   ██║██║╚██╗██║██╔══██╗██╔══██╗██║   ██║██║███╗██║
+╚██████╗███████╗╚██████╔╝██║ ╚████║██████╔╝██║  ██║╚██████╔╝╚███╔███╔╝
+ ╚═════╝╚══════╝ ╚═════╝ ╚═╝  ╚═══╝╚═════╝ ╚═╝  ╚═╝ ╚═════╝  ╚══╝╚══╝ 
+                    </pre>
+                    <div class="mt-4 font-mono text-sm tracking-widest text-red-500 glitch-text">SYSTEM READY // SELECT MODULE</div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 w-full max-w-6xl">
+                    
+                    <!-- NATIVE: GOOGLE SEARCH TERMINAL (RESTORED) -->
+                    <div onclick="window.openNativeApp('app-google-search', 'NET_SEARCH')" class="app-card p-6 cursor-pointer group">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-bold group-hover:text-white transition-colors duration-300">>> NET_SEARCH</h3>
+                            <span class="text-[10px] bg-red-900 px-2 py-1 border border-red-500 group-hover:bg-red-600 transition-colors duration-300">V.1.0</span>
+                        </div>
+                        <p class="text-xs opacity-60 mb-4 group-hover:opacity-100 transition-opacity duration-300">Global database uplink. Query external domains securely via proxy frame. Bypassing standard restrictions.</p>
+                        <div class="text-[10px] text-red-400 font-mono">STATUS: NATIVE READY</div>
+                    </div>
+
+                    <!-- LOCAL APP: CLONEXX_AI -->
+                    <div onclick="window.openAppSandbox('CLONEXX_AI', 'src-clonexxai')" class="app-card p-6 cursor-pointer group">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-bold group-hover:text-white transition-colors duration-300">>> CLONEXX_AI</h3>
+                            <span class="text-[10px] bg-red-900 px-2 py-1 border border-red-500 group-hover:bg-red-600 transition-colors duration-300">V.4.0.6</span>
+                        </div>
+                        <p class="text-xs opacity-60 mb-4 group-hover:opacity-100 transition-opacity duration-300">Cybernetic terminal interface. Deep-web entity for advanced conversational queries and raw data extraction.</p>
+                        <div class="text-[10px] text-red-400 font-mono">STATUS: SANDBOX LOADED</div>
+                    </div>
+
+                    <!-- LOCAL APP: RED_CELL_RESEARCH -->
+                    <div onclick="window.openAppSandbox('RESEARCH_NODE', 'src-research')" class="app-card p-6 cursor-pointer group">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-bold group-hover:text-white transition-colors duration-300">>> RED_CELL_RESEARCH</h3>
+                            <span class="text-[10px] bg-red-900 px-2 py-1 border border-red-500 group-hover:bg-red-600 transition-colors duration-300">V.2.1</span>
+                        </div>
+                        <p class="text-xs opacity-60 mb-4 group-hover:opacity-100 transition-opacity duration-300">Deep-web intelligence harvester. Synthesizes complete dossiers from global data layers and youtube metadata.</p>
+                        <div class="text-[10px] text-red-400 font-mono">STATUS: SANDBOX LOADED</div>
+                    </div>
+
+                    <!-- LOCAL APP: RED_CELL_EDU -->
+                    <div onclick="window.openAppSandbox('EDU_CORE', 'src-edu')" class="app-card p-6 cursor-pointer group">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-bold group-hover:text-white transition-colors duration-300">>> RED_CELL_EDU</h3>
+                            <span class="text-[10px] bg-red-900 px-2 py-1 border border-red-500 group-hover:bg-red-600 transition-colors duration-300">V.1.8</span>
+                        </div>
+                        <p class="text-xs opacity-60 mb-4 group-hover:opacity-100 transition-opacity duration-300">Academic synthesizer node. Generates comprehensive educational reports, historical context, and real-world deployment data.</p>
+                        <div class="text-[10px] text-red-400 font-mono">STATUS: SANDBOX LOADED</div>
+                    </div>
+
+                    <!-- LOCAL APP: TUTOR_NODE -->
+                    <div onclick="window.openAppSandbox('TUTOR_LINK', 'src-tutor')" class="app-card p-6 cursor-pointer group">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-bold group-hover:text-white transition-colors duration-300">>> TUTOR_NODE</h3>
+                            <span class="text-[10px] bg-red-900 px-2 py-1 border border-red-500 group-hover:bg-red-600 transition-colors duration-300">V.2.0</span>
+                        </div>
+                        <p class="text-xs opacity-60 mb-4 group-hover:opacity-100 transition-opacity duration-300">Conversational uplink to educational matrices. Dynamic tutoring, concept explanation, and interactive problem solving.</p>
+                        <div class="text-[10px] text-red-400 font-mono">STATUS: SANDBOX LOADED</div>
+                    </div>
+
+                    <!-- LOCAL APP: HOLO_FORGE -->
+                    <div onclick="window.openAppSandbox('HOLO_FORGE', 'src-holo')" class="app-card p-6 cursor-pointer group">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-bold group-hover:text-white transition-colors duration-300">>> HOLO_FORGE</h3>
+                            <span class="text-[10px] bg-red-900 px-2 py-1 border border-red-500 group-hover:bg-red-600 transition-colors duration-300">V.3.5</span>
+                        </div>
+                        <p class="text-xs opacity-60 mb-4 group-hover:opacity-100 transition-opacity duration-300">Neural reconstruction engine. Extracts depth and color vectors from visual input to compile fully stylized 3D diorama matrices.</p>
+                        <div class="text-[10px] text-red-400 font-mono">STATUS: SANDBOX LOADED</div>
+                    </div>
+
+                    <!-- LOCAL APP: GAME_ARCHITECT -->
+                    <div onclick="window.openAppSandbox('GAME_ARCHITECT', 'src-game')" class="app-card p-6 cursor-pointer group">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-bold group-hover:text-white transition-colors duration-300">>> GAME_NODE</h3>
+                            <span class="text-[10px] bg-red-900 px-2 py-1 border border-red-500 group-hover:bg-red-600 transition-colors duration-300">V.4.0</span>
+                        </div>
+                        <p class="text-xs opacity-60 mb-4 group-hover:opacity-100 transition-opacity duration-300">2D Engine Architect. Compiles HTML5 Canvas rendering and physics logic from raw text prompts into standalone executable sandboxes.</p>
+                        <div class="text-[10px] text-red-400 font-mono">STATUS: SANDBOX LOADED</div>
+                    </div>
+
+                    <!-- LOCAL APP: WEB_ARCHITECT -->
+                    <div onclick="window.openAppSandbox('WEB_ARCHITECT', 'src-web')" class="app-card p-6 cursor-pointer group">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-bold group-hover:text-white transition-colors duration-300">>> WEB_NODE</h3>
+                            <span class="text-[10px] bg-red-900 px-2 py-1 border border-red-500 group-hover:bg-red-600 transition-colors duration-300">V.3.0</span>
+                        </div>
+                        <p class="text-xs opacity-60 mb-4 group-hover:opacity-100 transition-opacity duration-300">Frontend Deployment Architect. Compiles responsive Tailwind/JS web interfaces directly from raw text prompts.</p>
+                        <div class="text-[10px] text-red-400 font-mono">STATUS: SANDBOX LOADED</div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- External Web Browser Container (Houses multiple sandboxed iframes) -->
+            <div id="browser-container" class="view-layer hidden w-full h-full relative z-10 bg-black">
+                <div class="iframe-controls">
+                    <p class="text-[9px] text-red-500 bg-black/80 px-2 py-1 border border-red-900 shadow-[0_0_8px_rgba(255,0,0,0.4)]">IFRAME HANDSHAKE ACTIVE</p>
+                </div>
+                <!-- Unique iframes will be dynamically injected here using Blob URLs -->
+                <div id="iframes-wrapper" class="w-full h-full relative"></div>
+            </div>
+
+            <!-- Search Results View -->
+            <div id="search-results" class="view-layer hidden flex flex-col h-full overflow-y-auto p-10 bg-black/80 backdrop-blur-md text-[#ff0000] z-10 relative">
+                <div class="mb-6 pb-2 border-b border-red-900 flex justify-between items-end">
+                    <div>
+                        <h2 class="text-2xl font-bold italic">BREACH RESULTS: <span id="search-query-display" class="text-white"></span></h2>
+                        <p class="text-xs opacity-50 mt-1">CRAWLER STATUS: COMPLETE</p>
+                    </div>
+                    <div class="text-[10px] border border-red-500 px-2 py-1">NODES UNCOVERED</div>
+                </div>
+                <div id="results-container" class="space-y-4"></div>
+            </div>
+
+            <!-- Proxy View -->
+            <div id="proxy-view" class="view-layer hidden flex flex-col h-full overflow-y-auto p-10 bg-black/90 text-[#ff0000] z-10 relative">
+                <div class="mb-4 pb-2 border-b border-red-900 flex justify-between items-center">
+                    <div>
+                        <h2 class="text-xl font-bold glitch-text">NEURAL RECONSTRUCTION</h2>
+                        <span id="proxy-url-display" class="text-[10px] opacity-50 font-mono block mt-1"></span>
+                    </div>
+                    <button onclick="window.closeProxy()" class="btn-action hover:bg-red-600">[DISCONNECT]</button>
+                </div>
+                <div class="border border-red-900 p-5 bg-[#050000] relative overflow-hidden">
+                    <div class="absolute inset-0 scanlines-bg opacity-30 pointer-events-none"></div>
+                    <div class="text-[10px] px-2 py-1 bg-[#300] border border-[#f00] inline-block mb-3 relative z-10">BYPASS_MODE: AI_RENDER</div>
+                    <div id="proxy-content" class="text-sm space-y-4 leading-relaxed whitespace-pre-wrap font-mono relative z-10"></div>
+                </div>
+            </div>
+
+            <!-- Crawl Overlay -->
+            <div id="crawl-overlay" class="absolute inset-0 bg-black/95 z-30 hidden flex flex-col items-center justify-center transition-opacity duration-200">
+                <div class="relative">
+                    <div class="w-48 h-48 border-4 border-red-900 border-t-red-500 rounded-full animate-spin"></div>
+                    <div class="w-32 h-32 border-4 border-transparent border-b-red-600 rounded-full animate-[spin_2s_linear_infinite_reverse] absolute top-8 left-8"></div>
+                </div>
+                <div class="mt-8 text-center">
+                    <p id="crawl-header" class="text-xl font-bold tracking-widest text-red-500">PENETRATING GATEWAY...</p>
+                    <p id="crawl-status" class="text-xs opacity-60 mt-2 font-mono text-red-400">Scanning decentralized nodes...</p>
+                </div>
+            </div>
+
+            <!-- NATIVE APP: GOOGLE SEARCH TERMINAL -->
+            <div id="app-google-search" class="view-layer hidden w-full h-full absolute top-0 left-0 bg-[#050000] text-[#ff0000] app-font text-lg z-20 crt-base">
+                <div class="absolute inset-0 pointer-events-none z-[50] opacity-60 scanlines-bg"></div>
+                
+                <div class="relative z-[60] p-8 w-full h-full flex flex-col overflow-y-auto ig-glow" onclick="document.getElementById('google-search-input').focus()">
+                    <div id="gs-boot-sequence" class="whitespace-pre-wrap mb-8 leading-tight text-red-500 text-shadow-sm"></div>
+                    
+                    <div id="gs-search-container" class="hidden items-center flex-wrap mt-4 bg-red-950/20 p-2 border-l-2 border-red-500">
+                        <span class="text-[#ff3333] mr-2">root@nexus:<span class="text-[#aa0000]">~/global_net</span>$</span>
+                        <span>./query_google.sh -q "</span>
+                        <form id="gs-google-form" class="flex flex-grow items-center">
+                            <input type="text" id="google-search-input" autocomplete="off" spellcheck="false" class="bg-transparent border-none text-white text-lg outline-none flex-grow caret-transparent !border-none !shadow-none ig-glow focus:bg-transparent">
+                        </form>
+                        <span>"</span><span class="inline-block w-2.5 h-[1.2em] bg-[#ff0000] align-middle ml-1 animate-[ig-blink_1s_step-end_infinite] shadow-[0_0_8px_#ff0000]"></span>
+                    </div>
+                    <div id="gs-output-log" class="mt-5 text-[#ff5555] font-bold"></div>
+                </div>
+
+                <div id="gs-iframe-window" class="hidden absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[95%] h-[90%] border-2 border-[#ff0000] bg-[#050000] z-[100] shadow-[0_0_30px_rgba(255,0,0,0.6)] flex-col transition-all duration-300">
+                    <div class="bg-gradient-to-r from-[#ff0000] to-[#800000] text-[#050000] p-2 flex justify-between font-bold select-none border-b border-white/20">
+                        <span class="animate-pulse">[SYS.NET.BROWSER] // SECURE_UPLINK</span>
+                        <div class="flex gap-4">
+                            <span class="cursor-pointer hover:text-white hover:drop-shadow-[0_0_8px_#ffffff] transition-all" onclick="window.popOutBrowser()" title="EXTRACT TO NEW TAB">[↗] EXTRACT</span>
+                            <span class="cursor-pointer hover:text-white hover:drop-shadow-[0_0_8px_#ffffff] transition-all bg-black/20 px-2" onclick="window.closeGsBrowser()" title="TERMINATE CONNECTION">[X] CLOSE</span>
+                        </div>
+                    </div>
+                    <iframe id="gs-search-frame" src="" class="w-full flex-grow border-none bg-white filter contrast-125"></iframe>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="text-[9px] px-4 py-1 flex justify-between border-t border-red-900 bg-black z-30 relative shadow-[0_-5px_10px_rgba(255,0,0,0.1)]">
+        <div class="animate-pulse text-red-500">OS: CLONBROW_v8.0 // SYSTEM FULLY OPTIMIZED</div>
+        <div class="text-red-500">SEC_HANDSHAKE: <span class="text-green-500 font-bold">VERIFIED</span> // UPTIME: <span id="uptime-val" class="font-bold text-white">0</span>s</div>
+    </footer>
+
+    <!-- ========================================== -->
+    <!-- SECURE APP DATA STORAGE                    -->
+    <!-- Added Content-Type Headers to fix "ERROR"  -->
+    <!-- ========================================== -->
+
+<script type="text/plain" id="src-clonexxai">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ClonexxAI | Terminal Interface</title>
+    <script src="https://cdn.tailwindcss.com">[END_SCRIPT_TAG]
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js">[END_SCRIPT_TAG]
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --hacker-red: #ff0000; --dark-bg: #0a0a0a; --panel-bg: #141414; }
+        body { background-color: var(--dark-bg); color: var(--hacker-red); font-family: 'Fira Code', monospace; overflow: hidden; height: 100vh; margin:0;}
+        .crt-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06)); background-size: 100% 2px, 3px 100%; pointer-events: none; z-index: 99; }
+        .scanline { width: 100%; height: 100px; z-index: 100; background: linear-gradient(0deg, rgba(0, 0, 0, 0) 0%, rgba(255, 0, 0, 0.1) 50%, rgba(0, 0, 0, 0) 100%); opacity: 0.1; position: absolute; bottom: 100%; animation: scanline 6s linear infinite; }
+        @keyframes scanline { 0% { bottom: 100%; } 100% { bottom: -100px; } }
+        .terminal-container { border: 1px solid var(--hacker-red); box-shadow: 0 0 15px rgba(255, 0, 0, 0.2); background: var(--panel-bg); height: calc(100vh - 40px); margin: 20px; display: flex; flex-direction: column; z-index: 10; position: relative;}
+        .status-bar { border-bottom: 1px solid var(--hacker-red); padding: 5px 15px; font-size: 0.8rem; display: flex; justify-content: space-between; align-items: center; background: #1a0000; }
+        #chat-window { flex-grow: 1; overflow-y: auto; padding: 20px; scrollbar-width: thin; scrollbar-color: var(--hacker-red) transparent; }
+        .message { margin-bottom: 20px; animation: fadeIn 0.3s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        .ai-message { border-left: 2px solid var(--hacker-red); padding-left: 15px; }
+        .user-message { color: #ffffff; opacity: 0.9; text-align: right; padding-right: 15px; }
+        .input-area { border-top: 1px solid var(--hacker-red); padding: 15px; display: flex; gap: 10px; background: #000; }
+        input[type="text"] { background: transparent; border: none; color: var(--hacker-red); flex-grow: 1; outline: none; font-size: 1rem; }
+        .emotion-tag { font-size: 0.7rem; text-transform: uppercase; background: rgba(255, 0, 0, 0.1); padding: 2px 6px; border-radius: 4px; margin-bottom: 5px; display: inline-block; }
+        .markdown-content p { margin-bottom: 10px; } .markdown-content pre { background: #000; padding: 10px; border: 1px solid var(--hacker-red); overflow-x: auto; margin-bottom: 10px; } .markdown-content code { background: #220000; padding: 2px 4px; border-radius: 3px; font-family: 'Fira Code', monospace; }
+    </style>
+</head>
+<body>
+    <div class="crt-overlay"></div>
+    <div class="scanline"></div>
+    <div class="terminal-container">
+        <div class="status-bar">
+            <span>SYSTEM: ClonexxAI v4.0.6</span>
+            <span id="timestamp"></span>
+        </div>
+        <div id="chat-window">
+            <div class="message ai-message">
+                <div class="emotion-tag">Status: Initialized</div>
+                <p><strong>[ClonexxAI]:</strong> System online. I am ClonexxAI. I have established a global uplink. Feed me a query.</p>
+            </div>
+        </div>
+        <div class="input-area">
+        <span class="font-bold">USR@CLONEXX_AI:~$</span>
+        <input type="text" id="user-input" placeholder="Enter command or query..." autocomplete="off">
+    </div>
+</div>
+<script>
+    const apiKey = "AIzaSyBHjiq9W8ljIIAtVNywGoD-dK1liER55DI"; 
+    const chatWindow = document.getElementById('chat-window');
+    const userInput = document.getElementById('user-input');
+    const timestamp = document.getElementById('timestamp');
+    let chatHistory = [];
+    setInterval(() => { timestamp.innerText = `UTC: ${new Date().toLocaleTimeString()}`; }, 1000);
+
+    async function callGemini(query) {
+        const payload = {
+            contents: [...chatHistory, { role: "user", parts: [{ text: query }] }],
+            tools: [{ "google_search": {} }]
+        };
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, { 
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload) 
+        });
+        if (!res.ok) {
+            const errData = await res.text();
+            throw new Error(`API Error ${res.status}: ${errData}`);
+        }
+        return await res.json();
+    }
+
+    async function handleSubmission() {
+        const query = userInput.value.trim(); if (!query) return;
+        chatWindow.innerHTML += `<div class="message user-message"><p>${query}</p></div>`;
+        userInput.value = ''; userInput.disabled = true;
+        try {
+            const data = await callGemini(query);
+            const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (!text) throw new Error("No data returned from API.");
+            chatHistory.push({ role: "user", parts: [{ text: query }] }, { role: "model", parts: [{ text: text }] });
+            chatWindow.innerHTML += `<div class="message ai-message"><div><strong>[ClonexxAI]:</strong> <div class="markdown-content mt-2">${marked.parse(text)}</div></div></div>`;
+        } catch (err) {
+            chatWindow.innerHTML += `<div class="message ai-message"><p>ERROR: ${err.message}</p></div>`;
+        }
+        userInput.disabled = false; userInput.focus(); chatWindow.scrollTop = chatWindow.scrollHeight;
+    }
+    userInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') handleSubmission(); });
+[END_SCRIPT_TAG]
+</body>
+</html>
+</script>
+
+<script type="text/plain" id="src-research">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RED-CELL | AI Research Terminal</title>
+    <script src="https://cdn.tailwindcss.com">[END_SCRIPT_TAG]
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js">[END_SCRIPT_TAG]
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --hacker-red: #ff0000; --hacker-dark: #0a0000; }
+        body { background-color: var(--hacker-dark); color: var(--hacker-red); font-family: 'Fira Code', monospace; margin: 0; overflow: hidden; height: 100vh; }
+        .terminal-container { background: rgba(10, 0, 0, 0.9); border: 1px solid var(--hacker-red); height: 90vh; display: flex; flex-direction: column; }
+        .terminal-header { background: var(--hacker-red); color: black; padding: 4px 12px; font-weight: bold; display: flex; justify-content: space-between; }
+        .intel-card { border-left: 2px solid var(--hacker-red); padding-left: 1rem; margin: 1rem 0; background: rgba(255, 0, 0, 0.05); }
+    </style>
+</head>
+<body class="p-6">
+    <div class="max-w-6xl mx-auto terminal-container relative overflow-hidden">
+        <div class="terminal-header"><span>[ STATUS: UPLINK_ESTABLISHED ]</span><span id="clock">00:00:00</span></div>
+        <div class="flex-1 flex flex-col p-6 overflow-hidden">
+            <div id="output" class="flex-1 overflow-y-auto mb-4 text-sm space-y-3">
+                <h1 class="text-3xl font-bold mb-2">NEURAL RESEARCH NODE</h1>
+                <p>Input target topic below. System will synthesize a complete dossier.</p>
+            </div>
+            <div class="border-t border-red-900/50 pt-4 flex items-center gap-3">
+                <input type="text" id="userInput" class="bg-transparent flex-1 border-none text-red-500 placeholder-red-900 outline-none" placeholder="research about..." autocomplete="off">
+                <button id="sendBtn" class="bg-red-600 text-black px-6 py-1 font-bold cursor-pointer">EXECUTE</button>
+            </div>
+        </div>
+    </div>
+    <div id="action-bar" class="max-w-6xl mx-auto mt-4 hidden">
+        <button id="exportBtn" class="border border-red-500 px-6 py-2 hover:bg-red-500 hover:text-black font-bold cursor-pointer">DOWNLOAD DOSSIER (.PDF)</button>
+    </div>
+<script>
+    const apiKey = "AIzaSyB4jRPvSEbvlou8A5jqq_9tGpG5U23yRdQ"; 
+    const output = document.getElementById('output');
+    const userInput = document.getElementById('userInput');
+    let lastResearchData = "";
+    setInterval(() => { document.getElementById('clock').textContent = new Date().toTimeString().split(' ')[0]; }, 1000);
+
+    document.getElementById('sendBtn').onclick = async () => {
+        const val = userInput.value.trim(); if (!val) return;
+        output.innerHTML += `<div><span class="text-white font-bold">[USER]:</span> ${val}</div>`;
+        userInput.value = "";
+        const payload = { contents: [{ parts: [{ text: val }] }], tools: [{ "google_search": {} }] };
+        
+        try {
+            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, { 
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload) 
+            });
+            if (!res.ok) throw new Error(`API Error ${res.status}: ${await res.text()}`);
+            const data = await res.json();
+            lastResearchData = data.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (!lastResearchData) throw new Error("No output generated by AI.");
+            
+            let html = lastResearchData.replace(/### (.*$)/gim, '<h3 class="text-xl font-bold mt-4 mb-2 text-white">$1</h3>').replace(/## (.*$)/gim, '<h2 class="text-2xl font-bold mt-6 mb-3 underline text-red-500">$1</h2>').replace(/\n/g, '<br>');
+            output.innerHTML += `<div class="intel-card"><span class="text-red-500 font-bold block mb-2">--- Dossier Received ---</span>${html}</div>`;
+            document.getElementById('action-bar').classList.remove('hidden');
+        } catch(e) {
+            output.innerHTML += `<div class="intel-card text-yellow-500">SYSTEM ERROR: ${e.message}</div>`;
+        }
+        output.scrollTop = output.scrollHeight;
+    };
+
+    document.getElementById('exportBtn').onclick = () => {
+        const div = document.createElement('div');
+        div.style = 'padding:40px; background:#000; color:#fff; font-family:Courier New;';
+        div.innerHTML = `<h1 style="color:#f00;">RED-CELL DOSSIER</h1><hr style="border-bottom:2px solid #f33;"><div style="font-size:14px; line-height:1.8;">${lastResearchData.replace(/\n/g, '<br>')}</div>`;
+        html2pdf().set({ margin:10, filename:`DOSSIER_${Date.now()}.pdf`, html2canvas:{scale:2,backgroundColor:'#000'} }).from(div).save();
+    };
+[END_SCRIPT_TAG]
+</body>
+</html>
+</script>
+
+<script type="text/plain" id="src-edu">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RED-CELL | Educational Report Node</title>
+    <script src="https://cdn.tailwindcss.com">[END_SCRIPT_TAG]
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js">[END_SCRIPT_TAG]
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body { background-color: #0a0000; color: #ff0000; font-family: 'Fira Code', monospace; margin: 0; overflow: hidden; height: 100vh; }
+        .terminal-container { background: rgba(10, 0, 0, 0.9); border: 1px solid #ff0000; height: 90vh; display: flex; flex-direction: column; }
+        .intel-card { border-left: 2px solid #ff0000; padding-left: 1rem; margin: 1rem 0; background: rgba(255, 0, 0, 0.05); }
+    </style>
+</head>
+<body class="p-6">
+    <div class="max-w-6xl mx-auto terminal-container">
+        <div class="bg-red-600 text-black px-4 py-1 font-bold">[ STATUS: ACADEMIC_UPLINK_ESTABLISHED ]</div>
+        <div class="flex-1 flex flex-col p-6 overflow-hidden">
+            <div id="output" class="flex-1 overflow-y-auto mb-4 text-sm space-y-3">
+                <h1 class="text-3xl font-bold mb-2">NEURAL EDUCATION NODE</h1>
+                <p class="text-white opacity-80">Enter a learning topic. System will synthesize a comprehensive academic report.</p>
+            </div>
+            <div class="border-t border-red-900/50 pt-4 flex gap-3">
+                <input type="text" id="userInput" class="bg-transparent flex-1 border-none text-red-500 placeholder-red-900 outline-none" placeholder="enter topic...">
+                <button id="sendBtn" class="bg-red-600 text-black px-6 py-1 font-bold cursor-pointer">COMPILE</button>
+            </div>
+        </div>
+    </div>
+    <div id="action-bar" class="max-w-6xl mx-auto mt-4 hidden">
+        <button id="exportBtn" class="border border-red-500 px-6 py-2 hover:bg-red-500 hover:text-black font-bold text-sm cursor-pointer">DOWNLOAD REPORT (.PDF)</button>
+    </div>
+<script>
+    const apiKey = "AIzaSyBHjiq9W8ljIIAtVNywGoD-dK1liER55DI"; 
+    const output = document.getElementById('output');
+    let lastData = "";
+    document.getElementById('sendBtn').onclick = async () => {
+        const val = document.getElementById('userInput').value.trim(); if (!val) return;
+        output.innerHTML += `<div><span class="text-white font-bold">[USER]:</span> ${val}</div>`;
+        document.getElementById('userInput').value = "";
+        
+        try {
+            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, { 
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ contents: [{ parts: [{ text: "Write an extremely detailed educational report on: " + val }] }] }) 
+            });
+            if (!res.ok) throw new Error(`API Error ${res.status}: ${await res.text()}`);
+            const data = await res.json();
+            lastData = data.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (!lastData) throw new Error("No report generated.");
+            
+            output.innerHTML += `<div class="intel-card"><span class="text-red-500 font-bold block mb-2">--- Report ---</span>${lastData.replace(/\n/g, '<br>')}</div>`;
+            document.getElementById('action-bar').classList.remove('hidden');
+        } catch(e) {
+            output.innerHTML += `<div class="intel-card text-yellow-500">SYSTEM ERROR: ${e.message}</div>`;
+        }
+        output.scrollTop = output.scrollHeight;
+    };
+    document.getElementById('exportBtn').onclick = () => {
+        const div = document.createElement('div'); div.style = 'padding:40px; background:#000; color:#fff; font-family:Courier New;';
+        div.innerHTML = `<h1 style="color:#f00;">EDU REPORT</h1><hr><div style="font-size:14px; line-height:1.8;">${lastData.replace(/\n/g, '<br>')}</div>`;
+        html2pdf().set({ margin:10, filename:`EDU_${Date.now()}.pdf`, html2canvas:{scale:2,backgroundColor:'#000'} }).from(div).save();
+    };
+[END_SCRIPT_TAG]
+</body>
+</html>
+</script>
+
+<script type="text/plain" id="src-tutor">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RED-CELL | AI Study Tutor</title>
+    <script src="https://cdn.tailwindcss.com">[END_SCRIPT_TAG]
+    <style>
+        body { background-color: #0a0000; color: #ff0000; font-family: monospace; margin: 0; overflow: hidden; height: 100vh; }
+        .terminal-container { background: rgba(10, 0, 0, 0.9); border: 1px solid #ff0000; height: 90vh; display: flex; flex-direction: column; }
+        .intel-card { border-left: 2px solid #ff0000; padding-left: 1rem; margin: 1rem 0; background: rgba(255, 0, 0, 0.05); }
+        .user-card { border-right: 2px solid #555; padding-right: 1rem; margin: 1rem 0; text-align: right; }
+    </style>
+</head>
+<body class="p-6">
+    <div class="max-w-6xl mx-auto terminal-container">
+        <div class="bg-red-600 text-black px-4 py-1 font-bold">[ STATUS: TUTOR_LINK_ACTIVE ]</div>
+        <div class="flex-1 flex flex-col p-6 overflow-hidden">
+            <div id="output" class="flex-1 overflow-y-auto mb-4 text-sm space-y-3">
+                <h1 class="text-2xl font-bold text-red-500 mb-2">NEURAL STUDY TUTOR</h1>
+            </div>
+            <div class="border-t border-red-900/50 pt-4 flex gap-3">
+                <input type="text" id="userInput" class="bg-transparent flex-1 border-none text-red-500 outline-none w-full" placeholder="Ask a question...">
+                <button id="sendBtn" class="bg-red-600 text-black px-6 py-1 font-bold cursor-pointer">TRANSMIT</button>
+            </div>
+        </div>
+    </div>
+<script>
+    const apiKey = "AIzaSyB4jRPvSEbvlou8A5jqq_9tGpG5U23yRdQ"; 
+    const output = document.getElementById('output');
+    let chatHistory = [];
+    document.getElementById('sendBtn').onclick = async () => {
+        const val = document.getElementById('userInput').value.trim(); if (!val) return;
+        output.innerHTML += `<div class="user-card"><span class="text-white font-bold block">YOU:</span> <span class="text-gray-300">${val}</span></div>`;
+        document.getElementById('userInput').value = '';
+        chatHistory.push({ role: "user", parts: [{ text: val }] });
+        
+        try {
+            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, { 
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ contents: chatHistory }) 
+            });
+            if(!res.ok) throw new Error(`API Error ${res.status}: ${await res.text()}`);
+            const data = await res.json();
+            const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+            if(!text) throw new Error("No output.");
+            
+            chatHistory.push({ role: "model", parts: [{ text: text }] });
+            output.innerHTML += `<div class="intel-card"><span class="text-red-500 font-bold block mb-2">TUTOR:</span>${text.replace(/\n/g, '<br>')}</div>`;
+        } catch(e) {
+            chatHistory.pop(); // Remove failed message from history
+            output.innerHTML += `<div class="intel-card text-yellow-500">SYSTEM ERROR: ${e.message}</div>`;
+        }
+        output.scrollTop = output.scrollHeight;
+    };
+[END_SCRIPT_TAG]
+</body>
+</html>
+</script>
+
+<script type="text/plain" id="src-holo">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HOLO-FORGE | AI Image to 3D Scene</title>
+    <script src="https://cdn.tailwindcss.com">[END_SCRIPT_TAG]
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js">[END_SCRIPT_TAG]
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js">[END_SCRIPT_TAG]
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/exporters/GLTFExporter.js">[END_SCRIPT_TAG]
+    <style>
+        body { background-color: #050000; color: #ff0000; font-family: monospace; margin: 0; overflow: hidden; height: 100vh; display: flex; flex-direction: column; }
+        .glass-panel { background: rgba(10, 0, 0, 0.9); border-right: 1px solid #ff0000; }
+        .drop-zone { border: 2px dashed rgba(255, 0, 0, 0.4); cursor: pointer; }
+        #canvas-container { width: 100%; height: 100%; position: relative; }
+    </style>
+</head>
+<body class="flex flex-col h-screen">
+    <header class="h-14 border-b border-red-900 flex items-center px-6 bg-black z-10"><h1 class="font-bold text-red-500">HOLO-FORGE</h1></header>
+    <div class="flex-1 flex flex-col md:flex-row overflow-hidden relative">
+        <div class="w-full md:w-80 glass-panel flex flex-col p-6 z-10 overflow-y-auto">
+            <div id="drop-zone" class="drop-zone flex flex-col items-center justify-center p-6 text-center mb-4 min-h-[160px]">
+                <p class="text-sm font-bold">DRAG & DROP IMAGE</p>
+                <input type="file" id="file-input" class="hidden" accept="image/*">
+            </div>
+            <button id="generate-btn" disabled class="bg-black border border-red-500 text-red-500 w-full py-3 font-bold mb-2 hover:bg-red-500 hover:text-black cursor-pointer">EXECUTE COMPILE</button>
+            <div id="status-log" class="text-xs text-red-500 mt-4 h-32 overflow-y-auto border p-2 border-red-900/30"></div>
+        </div>
+        <div class="flex-1 relative bg-[#050000]"><div id="canvas-container"></div></div>
+    </div>
+    <script>
+        const apiKey = "AIzaSyBHjiq9W8ljIIAtVNywGoD-dK1liER55DI"; 
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const generateBtn = document.getElementById('generate-btn');
+        const statusLog = document.getElementById('status-log');
+        let currentBase64Image = null, currentMimeType = null;
+        
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene(); scene.fog = new THREE.FogExp2(0x050000, 0.02);
+        const camera = new THREE.PerspectiveCamera(60, container.clientWidth / container.clientHeight, 0.1, 1000); camera.position.set(0, 10, 20);
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true }); renderer.setSize(container.clientWidth, container.clientHeight);
+        container.appendChild(renderer.domElement);
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        let aiGeneratedGroup = new THREE.Group(); scene.add(aiGeneratedGroup);
+        scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+        
+        function animate() { requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera); } animate();
+        function logStatus(msg) { statusLog.innerHTML += `<div>${msg}</div>`; statusLog.scrollTop = statusLog.scrollHeight; }
+        
+        dropZone.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0]; if(!file) return;
+            currentMimeType = file.type;
+            const reader = new FileReader();
+            reader.onload = (e) => { currentBase64Image = e.target.result.split(',')[1]; generateBtn.disabled = false; logStatus(`Image loaded.`); };
+            reader.readAsDataURL(file);
+        });
+
+        generateBtn.addEventListener('click', async () => {
+            if (!currentBase64Image) return;
+            generateBtn.disabled = true; logStatus("Compiling 3D Code...");
+            while(aiGeneratedGroup.children.length > 0) aiGeneratedGroup.remove(aiGeneratedGroup.children[0]);
+            const sys = `Write ONLY JS code using Three.js to build a 3D scene representing the image. Add objects to the global \`aiGeneratedGroup\`.`;
+            const payload = { contents: [{ parts: [{ text: sys }, { inlineData: { mimeType: currentMimeType, data: currentBase64Image } }] }] };
+            try {
+                let res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, { 
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload) 
+                });
+                if(!res.ok) throw new Error(`API Error ${res.status}: ${await res.text()}`);
+                let data = await res.json();
+                let code = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                if(!code) throw new Error("No code generated.");
+                code = code.replace(/```javascript|```js|```/g, '');
+                new Function('THREE', 'aiGeneratedGroup', code)(THREE, aiGeneratedGroup);
+                logStatus("Success.");
+            } catch(e) { logStatus("Error: " + e.message); }
+            generateBtn.disabled = false;
+        });
+    [END_SCRIPT_TAG]
+</body>
+</html>
+</script>
+
+<script type="text/plain" id="src-game">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>RED-CELL | Game Engine Node</title>
+    <script src="[https://cdn.tailwindcss.com](https://cdn.tailwindcss.com)">[END_SCRIPT_TAG]
+    <style>
+        body { background-color: #050000; color: #ff0000; font-family: monospace; overflow: hidden; height: 100vh; display: flex; margin:0; }
+        .glass-panel { background: rgba(10, 0, 0, 0.9); border-right: 1px solid #ff0000; width: 350px; padding: 20px; display: flex; flex-direction: column; }
+        textarea { background: rgba(255,0,0,0.1); border: 1px solid #ff0000; color: #ff0000; height: 150px; padding: 10px; width: 100%; outline: none; margin-bottom: 20px; }
+        button { background: #050000; border: 1px solid #ff0000; color: #ff0000; padding: 10px; cursor: pointer; margin-bottom:10px; font-weight: bold;}
+        button:hover { background: #ff0000; color: black; }
+        #preview-container { flex: 1; background: black; position: relative;}
+        iframe { width: 100%; height: 100%; border: none; }
+    </style>
+</head>
+<body>
+    <div class="glass-panel">
+        <h2 class="font-bold mb-4 text-xl">>> GAME NODE</h2>
+        <textarea id="prompt" placeholder="Describe 2D HTML5 Canvas game..."></textarea>
+        <button id="generate">COMPILE GAME</button>
+        <button id="exportBtn" style="display:none;">DOWNLOAD (.HTML)</button>
+        <div id="log" class="mt-4 text-xs overflow-y-auto">Waiting for input...</div>
+    </div>
+    <div id="preview-container"><iframe id="preview"></iframe></div>
+    <script>
+        const apiKey = "AIzaSyB4jRPvSEbvlou8A5jqq_9tGpG5U23yRdQ";
+        let generatedHtml = "";
+        document.getElementById('generate').onclick = async () => {
+            const prompt = document.getElementById('prompt').value;
+            const log = document.getElementById('log');
+            if(!prompt) return;
+            document.getElementById('generate').disabled = true;
+            log.innerHTML += "<br>Compiling logic...";
+            const sys = "Write a complete, single-file HTML5 Canvas game based on the prompt. ONLY output HTML.";
+            const payload = { contents: [{ parts: [{ text: prompt }] }], systemInstruction: { parts: [{ text: sys }] } };
+            try {
+                let res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, { 
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload) 
+                });
+                if(!res.ok) throw new Error(`API Error ${res.status}: ${await res.text()}`);
+                let data = await res.json();
+                let outputCode = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                if(!outputCode) throw new Error("No output generated.");
+                generatedHtml = outputCode.replace(/```html|```/gi, '').trim();
+                
+                // Use Blob to prevent CSP/srcdoc blocks
+                const blob = new Blob([generatedHtml], { type: 'text/html;charset=utf-8' });
+                document.getElementById('preview').src = URL.createObjectURL(blob);
+                
+                log.innerHTML += "<br>Deployed successfully.";
+                document.getElementById('exportBtn').style.display = "block";
+            } catch(e) { log.innerHTML += "<br>Error: " + e.message; }
+            document.getElementById('generate').disabled = false;
+        };
+        document.getElementById('exportBtn').onclick = () => {
+            if (!generatedHtml) return;
+            const blob = new Blob([generatedHtml], { type: 'text/html' });
+            const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = `GAME_${Date.now()}.html`;
+            link.click();
+        };
+    [END_SCRIPT_TAG]
+</body>
+</html>
+</script>
+
+<script type="text/plain" id="src-web">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>RED-CELL | Web Deployment Node</title>
+    <script src="[https://cdn.tailwindcss.com](https://cdn.tailwindcss.com)">[END_SCRIPT_TAG]
+    <style>
+        body { background-color: #050000; color: #ff0000; font-family: monospace; overflow: hidden; height: 100vh; display: flex; margin:0; }
+        .glass-panel { background: rgba(10, 0, 0, 0.9); border-right: 1px solid #ff0000; width: 350px; padding: 20px; display: flex; flex-direction: column; }
+        textarea { background: rgba(255,0,0,0.1); border: 1px solid #ff0000; color: #ff0000; height: 150px; padding: 10px; width: 100%; outline: none; margin-bottom: 20px; }
+        button { background: #050000; border: 1px solid #ff0000; color: #ff0000; padding: 10px; cursor: pointer; margin-bottom:10px; font-weight: bold;}
+        button:hover { background: #ff0000; color: black; }
+        #preview-container { flex: 1; background: white; }
+        iframe { width: 100%; height: 100%; border: none; }
+    </style>
+</head>
+<body>
+    <div class="glass-panel">
+        <h2 class="font-bold mb-4 text-xl">>> WEB NODE</h2>
+        <textarea id="prompt" placeholder="Describe a beautiful modern website..."></textarea>
+        <button id="generate">DEPLOY WEBSITE</button>
+        <button id="exportBtn" style="display:none;">DOWNLOAD (.HTML)</button>
+        <div id="log" class="mt-4 text-xs overflow-y-auto">Waiting for input...</div>
+    </div>
+    <div id="preview-container"><iframe id="preview"></iframe></div>
+    <script>
+        const apiKey = "AIzaSyBHjiq9W8ljIIAtVNywGoD-dK1liER55DI";
+        let generatedHtml = "";
+        document.getElementById('generate').onclick = async () => {
+            const prompt = document.getElementById('prompt').value;
+            const log = document.getElementById('log');
+            if(!prompt) return;
+            document.getElementById('generate').disabled = true;
+            log.innerHTML += "<br>Architecting DOM...";
+            const sys = "You are an Elite Web Developer. Write a breathtaking, standalone Tailwind HTML website based on the prompt. Include ALL CSS/JS inline. Output ONLY HTML without markdown block format.";
+            const payload = { contents: [{ parts: [{ text: prompt }] }], systemInstruction: { parts: [{ text: sys }] }, generationConfig: { temperature: 0.5 } };
+            try {
+                let res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, { 
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload) 
+                });
+                if(!res.ok) throw new Error(`API Error ${res.status}: ${await res.text()}`);
+                let data = await res.json();
+                let outputCode = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                if(!outputCode) throw new Error("No output generated.");
+                generatedHtml = outputCode.replace(/```html|```/gi, '').trim();
+                
+                // Use Blob to prevent CSP/srcdoc blocks
+                const blob = new Blob([generatedHtml], { type: 'text/html;charset=utf-8' });
+                document.getElementById('preview').src = URL.createObjectURL(blob);
+                
+                log.innerHTML += "<br>Website deployed.";
+                document.getElementById('exportBtn').style.display = "block";
+            } catch(e) { log.innerHTML += "<br>Error: " + e.message; }
+            document.getElementById('generate').disabled = false;
+        };
+        document.getElementById('exportBtn').onclick = () => {
+            if (!generatedHtml) return;
+            const blob = new Blob([generatedHtml], { type: 'text/html' });
+            const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = `WEB_${Date.now()}.html`;
+            link.click();
+        };
+    [END_SCRIPT_TAG]
+</body>
+</html>
+</script>
+
+    <!-- ========================================== -->
+    <!-- OS FUNCTION BINDINGS & OVERRIDES           -->
+    <!-- ========================================== -->
+    <script>
+        window.tabs = [{ id: 1, title: 'Home', type: 'home', data: null }];
+        window.activeTabId = 1;
+
+        // Secure Extractor to prevent parser crashes
+        window.openAppSandbox = function(appTitle, scriptId) {
+            const rawContentElem = document.getElementById(scriptId);
+            if (!rawContentElem) return;
+            
+            // Un-escape the closing script tags perfectly
+            let rawContent = rawContentElem.textContent.replace(/\[END_SCRIPT_TAG\]/g, '</scr' + 'ipt>');
+            
+            const newId = Date.now();
+            window.tabs.push({ id: newId, title: appTitle, type: 'sandbox', data: rawContent });
+            window.switchTab(newId);
+        };
+
+        window.openNativeApp = function(appId, appTitle) {
+            const newId = Date.now();
+            window.tabs.push({ id: newId, title: appTitle, type: 'native-app', data: appId });
+            window.switchTab(newId);
+        };
+
+        window.switchTab = function(id) {
+            window.activeTabId = id;
+            const tab = window.tabs.find(t => t.id === id);
+            if (!tab) return;
+            
+            const layers = ['home-screen', 'browser-container', 'search-results', 'proxy-view', 'app-google-search'].map(vid => document.getElementById(vid));
+            
+            layers.forEach(el => {
+                if (el && !el.classList.contains('hidden')) {
+                    el.classList.add('hidden');
+                    el.classList.remove('flex');
+                }
+            });
+
+            setTimeout(() => {
+                if (tab.type === 'home') { 
+                    const el = document.getElementById('home-screen');
+                    if (el) { el.classList.remove('hidden'); el.classList.add('flex'); }
+                }
+                else if (tab.type === 'search') {
+                    const el = document.getElementById('search-results');
+                    if (el) { el.classList.remove('hidden'); el.classList.add('flex'); }
+                    if (typeof window.renderResults === 'function') window.renderResults(tab.data.query, tab.data.results);
+                }
+                else if (tab.type === 'sandbox') { 
+                    const el = document.getElementById('browser-container');
+                    if (el) { el.classList.remove('hidden'); el.classList.add('flex'); }
+                    
+                    const wrapper = document.getElementById('iframes-wrapper');
+                    if (wrapper) {
+                        Array.from(wrapper.children).forEach(child => child.style.display = 'none');
+                        let frame = document.getElementById('frame-' + tab.id);
+                        
+                        if (!frame) {
+                            frame = document.createElement('iframe');
+                            frame.id = 'frame-' + tab.id;
+                            frame.className = "w-full h-full border-none absolute top-0 left-0 bg-black";
+                            frame.sandbox = "allow-scripts allow-forms allow-same-origin allow-popups allow-downloads allow-modals";
+                            
+                            // USING BLOB URLs over `srcdoc` fixes the strict CSP chromium "content is blocked" error
+                            const blob = new Blob([tab.data], { type: 'text/html;charset=utf-8' });
+                            frame.src = URL.createObjectURL(blob);
+                            
+                            wrapper.appendChild(frame);
+                        }
+                        frame.style.display = 'block';
+                    }
+                }
+                else if (tab.type === 'iframe') { 
+                    const el = document.getElementById('browser-container');
+                    if (el) { el.classList.remove('hidden'); el.classList.add('flex'); }
+                    
+                    const wrapper = document.getElementById('iframes-wrapper');
+                    if (wrapper) {
+                        Array.from(wrapper.children).forEach(child => child.style.display = 'none');
+                        let frame = document.getElementById('frame-' + tab.id);
+                        if (!frame) {
+                            frame = document.createElement('iframe');
+                            frame.id = 'frame-' + tab.id;
+                            frame.className = "w-full h-full border-none absolute top-0 left-0 bg-white";
+                            frame.sandbox = "allow-scripts allow-forms allow-same-origin allow-popups allow-downloads allow-modals";
+                            frame.src = tab.data;
+                            wrapper.appendChild(frame);
+                        }
+                        frame.style.display = 'block';
+                    }
+                }
+                else if (tab.type === 'proxy') {
+                    const el = document.getElementById('proxy-view');
+                    if (el) { el.classList.remove('hidden'); el.classList.add('flex'); }
+                    const urlDisplay = document.getElementById('proxy-url-display');
+                    if(urlDisplay) urlDisplay.innerText = String(tab.data).toUpperCase();
+                    
+                    const targetEl = document.getElementById('proxy-content');
+                    if(targetEl) {
+                        targetEl.innerHTML = '';
+                        const fullText = tab.proxyData || "";
+                        let i = 0;
+                        if(targetEl.typingInterval) clearInterval(targetEl.typingInterval);
+                        targetEl.typingInterval = setInterval(() => {
+                            targetEl.innerHTML += fullText.charAt(i);
+                            i++;
+                            if (i >= fullText.length) clearInterval(targetEl.typingInterval);
+                        }, 5);
+                    }
+                }
+                else if (tab.type === 'native-app') {
+                    const appElem = document.getElementById(tab.data);
+                    if(appElem) {
+                        appElem.classList.remove('hidden');
+                        appElem.classList.add('flex'); 
+                    }
+                    if (tab.data === 'app-google-search' && typeof window.gsBooted !== 'undefined' && !window.gsBooted && typeof window.runGsBootSequence === 'function') { 
+                        window.gsBooted = true; 
+                        window.runGsBootSequence(); 
+                    }
+                }
+            }, 10);
+
+            if (typeof window.updateUI === 'function') window.updateUI();
+        };
+
+        window.addNewTab = function() {
+            const newId = Date.now(); window.tabs.push({ id: newId, title: 'New Node', type: 'home', data: null }); window.switchTab(newId);
+        };
+        
+        window.closeTab = function(id) {
+            const frame = document.getElementById('frame-' + id);
+            if (frame) frame.remove();
+
+            if (window.tabs.length === 1) { 
+                window.tabs[0] = { id: Date.now(), title: 'Home', type: 'home', data: null }; 
+                window.switchTab(window.tabs[0].id); 
+                return; 
+            }
+            window.tabs = window.tabs.filter(t => t.id !== id);
+            if (window.activeTabId === id) window.activeTabId = window.tabs[window.tabs.length - 1].id;
+            window.switchTab(window.activeTabId);
+        };
+        
+        window.goHome = function() {
+            const tab = window.tabs.find(t => t.id === window.activeTabId);
+            if (tab) { tab.type = 'home'; tab.title = 'Home'; window.switchTab(window.activeTabId); }
+        };
+
+        window.navigate = function() {
+            const urlInp = document.getElementById('url-input');
+            if(!urlInp) return;
+            let query = urlInp.value.trim();
+            if (!query) return;
+            const isUrl = /^https?:\/\//i.test(query) || /^([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(\/.*)?$/.test(query) || query.toLowerCase().endsWith('.html');
+            if (isUrl && typeof window.openInNewNode === 'function') {
+                window.openInNewNode(query);
+            } else if (typeof window.initiateCrawl === 'function') {
+                window.initiateCrawl(query);
+            }
+        };
+
+        window.activateNeuralProxy = async function() {
+            const tab = window.tabs.find(t => t.id === window.activeTabId);
+            if (!tab) return;
+            
+            if (tab.type === 'sandbox' || (tab.type === 'iframe' && (!tab.data.startsWith('http')))) {
+                const ctrlDisp = document.querySelector('.iframe-controls p');
+                if(ctrlDisp) {
+                    const ogText = ctrlDisp.innerText;
+                    ctrlDisp.innerText = "ERROR: CANNOT PROXY LOCAL NODES";
+                    ctrlDisp.classList.replace('text-red-500', 'text-yellow-500');
+                    setTimeout(() => {
+                        ctrlDisp.innerText = ogText;
+                        ctrlDisp.classList.replace('text-yellow-500', 'text-red-500');
+                    }, 3000);
+                }
+                return;
+            }
+            if (typeof window.originalActivateNeuralProxy === 'function') {
+                window.originalActivateNeuralProxy();
+            }
+        };
+
+        window.closeProxy = function() {
+            const tab = window.tabs.find(t => t.id === window.activeTabId);
+            if (tab) {
+                tab.type = 'iframe';
+                window.switchTab(window.activeTabId);
+            }
+        };
+
+        window.closeGsBrowser = function() {
+            const gsIframeWindow = document.getElementById('gs-iframe-window');
+            if (gsIframeWindow) {
+                gsIframeWindow.style.opacity = '0';
+                gsIframeWindow.style.transform = 'translate(-50%, -50%) scale(0.95)';
+                setTimeout(() => {
+                    gsIframeWindow.classList.add('hidden');
+                    gsIframeWindow.classList.remove('flex');
+                    const frame = document.getElementById('gs-search-frame');
+                    if (frame) frame.src = '';
+                }, 300);
+            }
+            const input = document.getElementById('google-search-input');
+            const gsOutputLog = document.getElementById('gs-output-log');
+            if (input) {
+                input.value = '';
+                input.readOnly = false;
+                input.style.opacity = '1';
+                input.focus();
+            }
+            if (gsOutputLog) gsOutputLog.innerHTML = "";
+        };
+
+        window.popOutBrowser = function() {
+            if (typeof window.gsCurrentSearchQuery !== 'undefined' && window.gsCurrentSearchQuery) {
+                window.open(`https://www.google.com/search?q=${encodeURIComponent(window.gsCurrentSearchQuery)}`, '_blank');
+            }
+            window.closeGsBrowser();
+        };
+
+        // Optimized Matrix Background
+        const canvas = document.getElementById('matrix');
+        const ctx = canvas.getContext('2d');
+        let columns, drops = [];
+        const chars = "01アイウエオカキクケコサシスセソタチツテトナニヌネノ";
+        
+        function initMatrix() {
+            canvas.width = window.innerWidth; 
+            canvas.height = window.innerHeight;
+            columns = canvas.width / 20; 
+            drops = Array(Math.floor(columns)).fill(1);
+        }
+
+        function drawMatrix() {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.15)'; 
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.font = '18px monospace';
+            
+            for (let i = 0; i < drops.length; i++) {
+                const text = chars.charAt(Math.floor(Math.random() * chars.length));
+                ctx.fillStyle = drops[i] < 5 ? '#f00' : '#400';
+                ctx.fillText(text, i * 20, drops[i] * 20);
+                if (drops[i] * 20 > canvas.height && Math.random() > 0.975) drops[i] = 0;
+                drops[i]++;
+            }
+        }
+
+        window.onload = () => {
+            initMatrix();
+            setInterval(drawMatrix, 100); 
+            window.updateUI(); 
+            updateTime();
+            setInterval(updateTime, 1000);
+            setInterval(() => { const el = document.getElementById('uptime-val'); if (el) el.innerText = parseInt(el.innerText) + 1; }, 1000);
+            window.switchTab(1);
+        };
+        
+        let resizeTimer;
+        window.onresize = () => {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(initMatrix, 200);
+        };
+
+        function updateTime() { const el = document.getElementById('system-time'); if(el) el.innerText = `T: ${new Date().toLocaleTimeString()}`; }
+
+        window.updateUI = function() {
+            const tc = document.getElementById('tabs-container');
+            tc.innerHTML = window.tabs.map(tab => `
+                <div onclick="window.switchTab(${tab.id})" class="cursor-pointer px-4 py-1 text-[11px] whitespace-nowrap border-r border-red-950 transition-all duration-200 ${tab.id === window.activeTabId ? 'tab-active' : 'opacity-60 hover:opacity-100 hover:bg-red-900/30'}">
+                    ${tab.title} 
+                    <span onclick="event.stopPropagation(); window.closeTab(${tab.id})" class="ml-3 opacity-50 hover:text-white hover:opacity-100 transition-opacity">×</span>
+                </div>
+            `).join('');
+        };
+
+        window.gsBooted = false;
+        const gsBootText = [
+            "INITIALIZING KERNEL...",
+            "LOADING MODULES: DRV_NET, DRV_SEC, DRV_SYS...",
+            "MOUNTING ENCRYPTED FILESYSTEM... [OK]",
+            "BYPASSING LOCAL FIREWALL... [OK]",
+            "ESTABLISHING SECURE UPLINK TO GLOBAL DATABASES...",
+            "AUTHENTICATING...",
+            "ACCESS GRANTED.",
+            "",
+            "   ___  ____  ____  ___  __    ____ ",
+            "  / __)(  _ \\(  _ \\/ __)(  )  (  __)",
+            " ( (_ \\ )___/ )___/\\__ \\ )(__  ) _) ",
+            "  \\___/(__)  (__)  (___/(____)(____)",
+            "   SYSTEM ONLINE. GOOGLE MODULE ACTIVE.",
+            ""
+        ];
+
+        window.runGsBootSequence = function() {
+            const gsBootElement = document.getElementById('gs-boot-sequence');
+            const gsSearchContainer = document.getElementById('gs-search-container');
+            const gsSearchInput = document.getElementById('google-search-input');
+            
+            let gsLineIndex = 0;
+            let gsCharIndex = 0;
+
+            function typeWriter() {
+                if (gsLineIndex < gsBootText.length) {
+                    if (gsCharIndex < gsBootText[gsLineIndex].length) {
+                        gsBootElement.innerHTML += gsBootText[gsLineIndex].charAt(gsCharIndex);
+                        gsCharIndex++;
+                        setTimeout(typeWriter, 5);
+                    } else {
+                        gsBootElement.innerHTML += "<br>";
+                        gsLineIndex++;
+                        gsCharIndex = 0;
+                        setTimeout(typeWriter, 15);
+                    }
+                } else {
+                    gsBootElement.innerHTML = gsBootElement.innerHTML.replace("GOOGLE MODULE ACTIVE", "<span class='glitch-text text-white drop-shadow-[0_0_8px_red] animate-pulse'>GOOGLE MODULE ACTIVE</span>");
+                    if (gsSearchContainer) {
+                        gsSearchContainer.classList.remove('hidden');
+                        gsSearchContainer.classList.add('flex');
+                    }
+                    if (gsSearchInput) gsSearchInput.focus();
+                }
+            }
+            typeWriter();
+        };
+
+        const gsForm = document.getElementById('gs-google-form');
+        if (gsForm) {
+            gsForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const gsSearchInput = document.getElementById('google-search-input');
+                const gsOutputLog = document.getElementById('gs-output-log');
+                const gsSearchFrame = document.getElementById('gs-search-frame');
+                const gsIframeWindow = document.getElementById('gs-iframe-window');
+
+                const query = gsSearchInput.value.trim();
+                if (!query) return;
+                
+                window.gsCurrentSearchQuery = query;
+                gsOutputLog.innerHTML = "";
+                const logs = [
+                    `> INITIATING QUERY: "${query}"`,
+                    "> PINGING GOOGLE MAINFRAME...",
+                    "> RENDERING INTERNAL VIEW..."
+                ];
+
+                let logIndex = 0;
+                gsSearchInput.readOnly = true;
+
+                function showLog() {
+                    if (logIndex < logs.length) {
+                        const logLine = document.createElement('div');
+                        logLine.innerText = logs[logIndex];
+                        gsOutputLog.appendChild(logLine);
+                        logIndex++;
+                        setTimeout(showLog, 100);
+                    } else {
+                        setTimeout(() => {
+                            if (gsSearchFrame) gsSearchFrame.src = `https://www.google.com/search?q=${encodeURIComponent(query)}&igu=1`;
+                            if (gsIframeWindow) {
+                                gsIframeWindow.classList.remove('hidden');
+                                gsIframeWindow.classList.add('flex');
+                            }
+                        }, 200);
+                    }
+                }
+                showLog();
+            });
+        }
+    </script>
+</body>
+</html>
